@@ -8,6 +8,8 @@ pub struct RotateTo {
     pub entity: Entity,
     /// The rotated entity will match its [`Transform::up()`] according to this
     pub updir: UpDirection,
+    /// Whether to flip the object along the vertical axis (180-degree rotation around the up direction)
+    pub flip_vertical: bool,
 }
 
 /// The rotated entity will try to have its [`Transform::up()`] direction matching this selection
@@ -66,7 +68,13 @@ fn rotate_towards(
             }
         };
 
-        let rotation = calculate_local_rotation_to_target(rotator_gt, target_gt, parent_gt, updir);
+        let rotation = calculate_local_rotation_to_target(
+            rotator_gt,
+            target_gt,
+            parent_gt,
+            updir,
+            target.flip_vertical,
+        );
 
         rotator_t.rotation = rotation;
     }
@@ -78,6 +86,7 @@ pub fn calculate_local_rotation_to_target(
     target_gt: &GlobalTransform,
     parent_gt: Option<&GlobalTransform>,
     updir: Dir3,
+    flip_vertical: bool,
 ) -> Quat {
     let target_gt_computed = target_gt.compute_transform();
     let parent_gt_computed: Option<Transform> = parent_gt.map(|p| p.compute_transform());
@@ -86,6 +95,11 @@ pub fn calculate_local_rotation_to_target(
         .compute_transform()
         .looking_at(target_gt_computed.translation, updir)
         .rotation;
+
+    if flip_vertical {
+        // Apply a 180-degree rotation around the up direction to flip the object vertically.
+        rotation = Quat::from_axis_angle(updir.normalize(), std::f32::consts::PI) * rotation;
+    }
 
     if let Some(parent_gt_computed) = parent_gt_computed {
         rotation = parent_gt_computed.rotation.inverse() * rotation;
