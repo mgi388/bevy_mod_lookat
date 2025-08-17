@@ -9,7 +9,11 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(RotateTowardsPlugin)
         .add_systems(Startup, setup)
-        .add_systems(Update, (mover, rotate, draw_axes, draw_forward))
+        .add_systems(Update, (mover, rotate))
+        .add_systems(
+            PostUpdate,
+            (draw_axes, draw_forward).after(RotateTowardsSystems::ApplyRotation),
+        )
         .run();
 }
 

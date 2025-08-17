@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-#[derive(Component)]
+#[derive(Clone, Component, Debug, Reflect)]
+#[reflect(Component, Debug)]
 /// When this component is added on an entity, [`Transform::forward()`] direction points towards the selected
 /// entity
 pub struct RotateTo {
@@ -12,6 +13,8 @@ pub struct RotateTo {
     pub flip_vertical: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Reflect)]
+#[reflect(Debug, PartialEq)]
 /// The rotated entity will try to have its [`Transform::up()`] direction matching this selection
 pub enum UpDirection {
     /// Will synchronize the direction of UP towards the UP direction of the target
@@ -26,24 +29,36 @@ pub enum UpDirection {
     Dir(Dir3),
 }
 
+/// Set enum for the systems relating to rotation towards a target.
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+pub enum RotateTowardsSystems {
+    /// System that rotates entities towards its target.
+    ApplyRotation,
+}
+
 /// Plugin that constantly rotates entities towards a selected target when they have the [`RotateTo`] component on them
 /// if you only want the math for calculating the local rotation needed to look at a target, see [`calculate_local_rotation_to_target`]
 pub struct RotateTowardsPlugin;
 
 impl Plugin for RotateTowardsPlugin {
     fn build(&self, app: &mut App) {
+        app.register_type::<RotateTo>();
+
         app.add_systems(
             PostUpdate,
-            rotate_towards.before(TransformSystem::TransformPropagate),
+            (rotate_towards, update_global_transforms)
+                .chain()
+                .in_set(RotateTowardsSystems::ApplyRotation)
+                .after(TransformSystem::TransformPropagate),
         );
     }
 }
 
 fn rotate_towards(
-    global_transforms: Query<&GlobalTransform>, // potential_targets
-    mut rotators: Query<(&mut Transform, &GlobalTransform, Option<&Parent>, &RotateTo)>, // the ones to rotate
+    global_transforms: Query<&GlobalTransform>,
+    mut rotators: Query<(&GlobalTransform, &mut Transform, Option<&Parent>, &RotateTo)>,
 ) {
-    for (mut rotator_t, rotator_gt, parent, target) in rotators.iter_mut() {
+    for (rotator_gt, mut rotator_t, parent, target) in rotators.iter_mut() {
         let Ok(target_gt) = global_transforms.get(target.entity) else {
             bevy::log::error!("Entity used as target was not found: {}", target.entity);
             continue;
@@ -76,7 +91,23 @@ fn rotate_towards(
             target.flip_vertical,
         );
 
-        rotator_t.rotation = rotation;
+        const EPSILON: f32 = 1e-6;
+        if !rotation.abs_diff_eq(rotator_t.rotation, EPSILON) {
+            rotator_t.rotation = rotation;
+        }
+    }
+}
+
+fn update_global_transforms(
+    transform_helper: TransformHelper,
+    mut query: Query<(Entity, &mut GlobalTransform), (With<RotateTo>, Changed<Transform>)>,
+) {
+    for (entity, mut global_transform) in query.iter_mut() {
+        // Update the global transform to match the new rotation.
+        let gt = transform_helper
+            .compute_global_transform(entity)
+            .expect("Failed to compute global transform");
+        *global_transform = gt;
     }
 }
 
