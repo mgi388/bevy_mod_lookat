@@ -177,7 +177,7 @@ fn rotate_towards_with_updated_global_transforms(
 
         // workaround since if we have a mutable access to Transforms in the rotators query,
         // we will create a Query Conflict panic
-        let mut new_rotator_t = rotator_t.clone();
+        let mut new_rotator_t = *rotator_t;
         new_rotator_t.rotation = rotation;
 
         let Ok(mut ec) = commands.get_entity(rotator_e) else {
