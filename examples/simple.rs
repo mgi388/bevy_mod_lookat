@@ -112,6 +112,7 @@ fn setup(
                             entity: target_id,
                             // this choses what the flat side should be in relation towards
                             updir: UpDirection::Parent,
+                            flip_vertical: false,
                         },
                         ShowForward,
                     ));
@@ -187,6 +188,7 @@ mod tests {
                                     entity: target_id,
                                     // this choses what the flat side should be in relation towards
                                     updir: UpDirection::Parent,
+                                    flip_vertical: false,
                                 },
                                 ShowForward,
                             ));

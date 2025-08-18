@@ -21,7 +21,7 @@ A Bevy Plugin and library to help with rotating an entity towards a target even 
 
 ## Example
 
-``` rust
+```rust
 //! A simple 3D scene with light shining over a cube sitting on a plane.
 use bevy::{color::palettes::css::*, prelude::*, render::primitives::Aabb};
 use bevy_mod_lookat::*;
@@ -136,6 +136,7 @@ fn setup(
                             entity: target_id,
                             // this choses what the flat side should be in relation towards
                             updir: UpDirection::Parent,
+                            flip_vertical: false,
                         },
                         ShowForward,
                     ));
@@ -211,6 +212,7 @@ mod tests {
                                     entity: target_id,
                                     // this choses what the flat side should be in relation towards
                                     updir: UpDirection::Parent,
+                                    flip_vertical: false,
                                 },
                                 ShowForward,
                             ));
