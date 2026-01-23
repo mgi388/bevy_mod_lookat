@@ -111,8 +111,8 @@ fn setup(
                         RotateTo {
                             entity: target_id,
                             // this choses what the flat side should be in relation towards
-                            updir: UpDirection::Parent,
-                            flip_vertical: false,
+                            up_direction: UpDirection::Parent,
+                            forward_direction: ForwardDirection::Forward,
                         },
                         ShowForward,
                     ));
@@ -187,8 +187,8 @@ mod tests {
                                 RotateTo {
                                     entity: target_id,
                                     // this choses what the flat side should be in relation towards
-                                    updir: UpDirection::Parent,
-                                    flip_vertical: false,
+                                    up_direction: UpDirection::Parent,
+                                    forward_direction: ForwardDirection::Forward,
                                 },
                                 ShowForward,
                             ));

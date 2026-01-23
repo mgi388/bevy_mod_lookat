@@ -1,18 +1,21 @@
+use core::f32::consts::*;
+
 use bevy::prelude::*;
 
 #[derive(Clone, Component, Debug, Reflect)]
 #[reflect(Component, Debug)]
-/// When this component is added on an entity, [`Transform::forward()`] direction points towards the selected
-/// entity always
+/// When this component is added on an entity, [`Transform::forward()`]
+/// direction points towards the selected entity always.
 #[relationship(relationship_target = RotatedToBy)]
 pub struct RotateTo {
-    /// entity to target, the Targeted entity must have a [`GlobalTransform`]
+    /// Entity to target. The targeted entity must have a [`GlobalTransform`].
     #[relationship]
     pub entity: Entity,
     /// The rotated entity will match its [`Transform::up()`] according to this
-    pub updir: UpDirection,
-    /// Whether to flip the object along the vertical axis (180-degree rotation around the up direction)
-    pub flip_vertical: bool,
+    /// direction.
+    pub up_direction: UpDirection,
+    /// Which axis of the entity should point toward the target.
+    pub forward_direction: ForwardDirection,
 }
 
 #[derive(Component, Debug, Reflect)]
@@ -34,6 +37,32 @@ pub enum UpDirection {
     /// Keeps a static direction of UP set to this value
     /// useful when you want to decide what is up for the entity under rotation
     Dir(Dir3),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Reflect, Default)]
+#[reflect(Debug, PartialEq)]
+/// Specifies which end of the entity should point toward the target, using
+/// Bevy's directional terminology.
+///
+/// As documented in [`RotateTo`], this component makes [`Transform::forward()`]
+/// point at the target. However, Bevy's [`Transform::forward()`] returns the -Z
+/// axis, while many 3D models are authored with their "front" facing the +Z
+/// axis ([`Transform::back()`]). This enum lets you choose the appropriate
+/// direction for your model.
+pub enum ForwardDirection {
+    /// [`Transform::forward()`] (the -Z axis) will point at the target.
+    ///
+    /// This is Bevy's default camera convention.
+    ///
+    /// Use this for camera-like behavior or models whose "front" faces -Z.
+    #[default]
+    Forward,
+    /// [`Transform::back()`] (the +Z axis) will point at the target.
+    ///
+    /// This is the most common case for 3D models, sprites, and primitives
+    ///
+    /// which are typically authored with their "front" facing +Z.
+    Back,
 }
 
 /// Plugin that constantly rotates entities towards a selected target when they have the [`RotateTo`]
@@ -101,7 +130,7 @@ fn rotate_towards_without_updating_global_transforms(
             None
         };
 
-        let updir = match target.updir {
+        let up_dir = match target.up_direction {
             UpDirection::Target => target_gt.up(),
             UpDirection::Dir(dir) => dir,
             UpDirection::Parent => {
@@ -118,8 +147,8 @@ fn rotate_towards_without_updating_global_transforms(
             rotator_gt,
             target_gt,
             parent_gt,
-            updir,
-            target.flip_vertical,
+            up_dir,
+            target.forward_direction,
         );
 
         rotator_t.rotation = rotation;
@@ -149,7 +178,7 @@ fn rotate_towards_with_updated_global_transforms(
             None
         };
 
-        let updir = match target.updir {
+        let up_dir = match target.up_direction {
             UpDirection::Target => target_gt.up(),
             UpDirection::Dir(dir) => dir,
             UpDirection::Parent => {
@@ -170,8 +199,8 @@ fn rotate_towards_with_updated_global_transforms(
             &rotator_gt,
             &target_gt,
             parent_gt.as_ref(),
-            updir,
-            target.flip_vertical,
+            up_dir,
+            target.forward_direction,
         );
 
         // workaround since if we have a mutable access to Transforms in the rotators query,
@@ -187,27 +216,28 @@ fn rotate_towards_with_updated_global_transforms(
     }
 }
 
-/// Calculates the local rotation on a rotator towards a target,
-/// adjusting for rotations of eventual parents,
-/// with the selected rotator up direction.
+/// Calculates the local rotation on a rotator towards a target, adjusting for
+/// rotations of eventual parents, with the selected rotator up direction and
+/// forward direction.
 pub fn calculate_local_rotation_to_target(
     rotator_gt: &GlobalTransform,
     target_gt: &GlobalTransform,
     parent_gt: Option<&GlobalTransform>,
-    updir: Dir3,
-    flip_vertical: bool,
+    up_direction: Dir3,
+    forward_direction: ForwardDirection,
 ) -> Quat {
     let target_gt_computed = target_gt.compute_transform();
     let parent_gt_computed: Option<Transform> = parent_gt.map(|p| p.compute_transform());
 
     let mut rotation = rotator_gt
         .compute_transform()
-        .looking_at(target_gt_computed.translation, updir)
+        .looking_at(target_gt_computed.translation, up_direction)
         .rotation;
 
-    if flip_vertical {
-        // Apply a 180-degree rotation around the up direction to flip the object vertically.
-        rotation = Quat::from_axis_angle(updir.normalize(), std::f32::consts::PI) * rotation;
+    // Bevy's looking_at makes -Z (forward) point at the target. If the entity's
+    // front faces +Z (back), apply 180 degrees rotation.
+    if forward_direction == ForwardDirection::Back {
+        rotation = Quat::from_axis_angle(*up_direction, PI) * rotation;
     }
 
     if let Some(parent_gt_computed) = parent_gt_computed {
